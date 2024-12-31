@@ -4,20 +4,19 @@ import torch.nn as nn
 
 class InputEmbeddings(nn.Module):
 
-    def __init__(self, d_model: int, vocab_size: int) -> None:
+    def __init__(self, d_model: int, vocab_size: int):
         super().__init__()
         self.d_model = d_model
         self.vocab_size = vocab_size
         self.embedding = nn.Embedding(vocab_size, d_model)
 
     def forward(self, x):
-        embedded = self.embedding(x) * math.sqrt(self.d_model)
         # print(f"Shape of embedded input: {embedded.shape}")
-        return embedded # multiply with d_model as described in the paper
+        return self.embedding(x) * math.sqrt(self.d_model) # multiply with d_model as described in the paper
 
 
 class PositionalEncoding(nn.Module):
-    def __init__(self, d_model: int, seq_len: int, dropout: float) -> None:
+    def __init__(self, d_model: int, seq_len: int, dropout: float):
         super().__init__()
         self.d_model = d_model
         self.seq_len = seq_len
@@ -78,7 +77,7 @@ class FeedForwardBlock(nn.Module):
 
 
 # Now MultiHead Attention!! :)
-class MultiHeadAttention(nn.Module):
+class MultiHeadAttentionBlock(nn.Module):
     def __init__(self, d_model: int, h: int, dropout: float) -> None:
         super().__init__()
         self.d_model = d_model
@@ -101,7 +100,7 @@ class MultiHeadAttention(nn.Module):
         # (Batch, h, Seq_Len, d_k) --> (Batch, h, Seq_Len, Seq_Len)
         attention_scores = (query @ key.transpose(-2, -1)) / math.sqrt(d_k) # transpose -2, -1 just transposes whole and rearranges the index 2nd last with last
         if mask is not None:
-            attention_scores.masked_fill(mask == 0, -1e9)
+            attention_scores.masked_fill_(mask == 0, -1e9)
 
         attention_scores = attention_scores.softmax(dim = -1)
 
@@ -115,9 +114,9 @@ class MultiHeadAttention(nn.Module):
         # print("Shape of q before w_q:", q.shape)
         # print("Shape of k before w_k:", k.shape)
         # print("Shape of v before w_v:", v.shape)
-        q = q.to(torch.float32)
-        k = k.to(torch.float32)
-        v = v.to(torch.float32)
+        # q = q.to(torch.float32)
+        # k = k.to(torch.float32)
+        # v = v.to(torch.float32)
         query = self.w_q(q) # (Batch, Seq_len, d_model) --> (Batch, Seq_len, d_model
         key = self.w_k(k) # (Batch, Seq_len, d_model) --> (Batch, Seq_len, d_model
         value = self.w_v(v) # (Batch, Seq_len, d_model) --> (Batch, Seq_len, d_model
@@ -125,10 +124,10 @@ class MultiHeadAttention(nn.Module):
         # Now split the qkv to h smaller matrices
         # (Batch, Seq_len, d_model) --> (Batch, Seq_len, h, d_k) --> (Batch, h, Seq_len, d_k)
         query = query.view(query.shape[0], query.shape[1], self.h, self.d_k).transpose(1,2)
-        key = key.view(query.shape[0], key.shape[1], self.h, self.d_k).transpose(1, 2)
+        key = key.view(key.shape[0], key.shape[1], self.h, self.d_k).transpose(1, 2)
         value = value.view(value.shape[0], value.shape[1], self.h, self.d_k).transpose(1, 2)
 
-        x, self.attention_scores = MultiHeadAttention.attention(query, key, value, mask, self.dropout)
+        x, self.attention_scores = MultiHeadAttentionBlock.attention(query, key, value, mask, self.dropout)
 
         # (Batch, h, Seq_Len, d_k) --> (Batch, Seq_Len, h, d_k) --> (Batch, Seq_Len, d_model)
         x = x.transpose(1,2).contiguous().view(x.shape[0], -1, self.h * self.d_k)
@@ -145,13 +144,11 @@ class ResidualConnection(nn.Module):
         self.norm = LayerNormalization()
 
     def forward(self, x, sublayer):
-        y = sublayer(self.norm(x))
-        assert y.shape == x.shape, f"Shape mismatch in ResidualConnection: x={x.shape}, y={y.shape}"
-        return x + self.dropout(y)
+        return x + self.dropout(sublayer(self.norm(x)))
 
 
 class EncoderBlock(nn.Module):
-    def __init__(self, self_attention_block: MultiHeadAttention, feed_forward_block: FeedForwardBlock, dropout: float) -> None:
+    def __init__(self, self_attention_block: MultiHeadAttentionBlock, feed_forward_block: FeedForwardBlock, dropout: float) -> None:
         super().__init__()
         self.self_attention_block = self_attention_block
         self.feed_forward_block = feed_forward_block
@@ -174,16 +171,13 @@ class Encoder(nn.Module):
     def forward(self, x, mask):
         for layer in self.layers:
             x = layer(x, mask)
-            # print(f"Shape after encoder layer: {x.shape}")
-        x = self.norm(x)
-        # print(f"Shape after normalization: {x.shape}")
-        return x
+        return self.norm(x)
 
 ## ENCODER DONE!!
 
 # DECODER
 class DecoderBlock(nn.Module):
-    def __init__(self, self_attention_block: MultiHeadAttention, cross_attention_block: MultiHeadAttention, feed_forward_block: FeedForwardBlock, dropout: float) -> None:
+    def __init__(self, self_attention_block: MultiHeadAttentionBlock, cross_attention_block: MultiHeadAttentionBlock, feed_forward_block: FeedForwardBlock, dropout: float) -> None:
         super().__init__()
         self.self_attention_block = self_attention_block
         self.cross_attention_block = cross_attention_block
@@ -191,14 +185,8 @@ class DecoderBlock(nn.Module):
         self.residual_connections = nn.ModuleList([ResidualConnection(dropout) for _ in range (3)])
 
     def forward(self, x, encoder_output, src_mask, tgt_mask):
-        assert x.dim() == 3, f"x must have 3 dimensions, got {x.shape}"
-        assert encoder_output.dim() == 3, f"encoder_output must have 3 dimensions, got {encoder_output.shape}"
-        assert x.shape[-1] == encoder_output.shape[
-            -1], f"Feature dimensions of x and encoder_output must match, got {x.shape[-1]} and {encoder_output.shape[-1]}"
-
         x = self.residual_connections[0](x, lambda x: self.self_attention_block(x, x, x, tgt_mask))
-        x = self.residual_connections[1](x, lambda x: self.cross_attention_block(x, encoder_output, encoder_output,
-                                                                                 src_mask))
+        x = self.residual_connections[1](x, lambda x: self.cross_attention_block(x, encoder_output, encoder_output, src_mask))
         x = self.residual_connections[2](x, self.feed_forward_block)
         return x
 
@@ -245,9 +233,8 @@ class Transformer(nn.Module):
     def encode(self, src, src_mask):
         src = self.src_embed(src)
         src = self.src_pos(src)
-        encoder_output = self.encoder(src, src_mask)
         # print("Shape of encoder_output after Encoder:", encoder_output.shape)
-        return encoder_output
+        return self.encoder(src, src_mask)
 
 
     def decode(self, encoder_output, src_mask, tgt, tgt_mask):
@@ -273,7 +260,7 @@ def build_transformer(src_vocab_size: int, tgt_vocab_size: int, src_seq_len: int
     # create encoder blocka
     encoder_blocks = []
     for _ in range(N):
-        encoder_self_attention_block = MultiHeadAttention(d_model, h, dropout)
+        encoder_self_attention_block = MultiHeadAttentionBlock(d_model, h, dropout)
         feed_forward_block = FeedForwardBlock(d_model, d_ff, dropout)
         encoder_block = EncoderBlock(encoder_self_attention_block, feed_forward_block, dropout)
         encoder_blocks.append(encoder_block)
@@ -281,8 +268,8 @@ def build_transformer(src_vocab_size: int, tgt_vocab_size: int, src_seq_len: int
     # create decoder blocka
     decoder_blocks = []
     for _ in range(N):
-        decoder_self_attention_block = MultiHeadAttention(d_model, h, dropout)
-        decoder_cross_attention_block = MultiHeadAttention(d_model, h, dropout)
+        decoder_self_attention_block = MultiHeadAttentionBlock(d_model, h, dropout)
+        decoder_cross_attention_block = MultiHeadAttentionBlock(d_model, h, dropout)
         feed_forward_block = FeedForwardBlock(d_model, d_ff, dropout)
         decoder_block = DecoderBlock(decoder_self_attention_block, decoder_cross_attention_block, feed_forward_block, dropout)
         decoder_blocks.append(decoder_block)
