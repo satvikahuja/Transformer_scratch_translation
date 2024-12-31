@@ -1,5 +1,3 @@
-Below is the content for your README.md file:
-
 # Transformer from Scratch: Language Translation (English to Italian)
 
 This project implements a transformer model from scratch for English-to-Italian language translation, inspired by Umar Jamil's tutorial video on transformers. The goal is to understand transformers by building and training one without relying on pre-built libraries.
@@ -75,10 +73,5 @@ During training, the model generates translations for validation examples. A typ
 	•	Target Sentence (Ground Truth)
 	•	Model Prediction
 
-Acknowledgments
-
-This project was inspired by Umar Jamil’s in-depth video tutorial on transformers. Check out his video here.
 
 Feel free to contribute or suggest improvements!
-
-Let me know if you'd like to customize this further!
