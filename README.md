@@ -12,7 +12,7 @@ This project is based on Umar Jamil's tutorial: [Building Transformer from Scrat
 - `dataset.py`: Includes the `BilingualDataset` class for processing English-Italian sentence pairs, creating tokenized inputs, and applying necessary masking.
 - `model.py`: Defines the transformer model, including encoder, decoder, multi-head attention, and feed-forward layers.
 - `train.py`: Handles the training process, including data loading, model training, and validation.
-- `My_notes.pdf`: Notes explaining the concepts of transformers, including encoder-decoder structure, attention mechanisms, and training vs. inference processes.
+- `My_notes.pdf`: My handwritten notes explaining the concepts of transformers, including encoder-decoder structure, attention mechanisms, and training vs. inference processes.
 
 ---
 
