@@ -4,7 +4,7 @@ This project implements a transformer model from scratch for English-to-Italian 
 
 ## Learning Source
 
-This project is based on Umar Jamil's tutorial: [Building Transformer from Scratch](https://www.youtube.com/watch?v=ISNdQcPhsts&t=9601s).
+This project is based on Umar Jamil's tutorial: [Building Transformer from Scratch](https://www.youtube.com/watch?v=ISNdQcPhsts).
 
 ## Project Structure
 
